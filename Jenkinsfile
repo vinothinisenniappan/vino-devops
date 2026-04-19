@@ -16,15 +16,7 @@ pipeline {
             }
         }
 
-        // Stage 2: Build Docker Image
-        stage('Build Docker Image') {
-            steps {
-                echo 'Building Docker image...'
-                bat "docker build --no-cache -t %DOCKER_IMAGE%:%TAG% ."
-            }
-        }
-
-        // Stage 3: Login to Docker Hub
+        // Stage 2: Login to Docker Hub
         stage('Login to Docker Hub') {
             steps {
                 echo 'Logging into Docker Hub...'
@@ -35,6 +27,14 @@ pipeline {
                 )]) {
                     bat "echo %PASS% | docker login -u %USER% --password-stdin"
                 }
+            }
+        }
+
+        // Stage 3: Build Docker Image
+        stage('Build Docker Image') {
+            steps {
+                echo 'Building Docker image...'
+                bat "docker build --no-cache -t %DOCKER_IMAGE%:%TAG% ."
             }
         }
 
