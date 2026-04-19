@@ -1,164 +1,129 @@
-# 🚀 Vino DevOps — CI/CD Pipeline with Jenkins, Docker & Kubernetes
+# Vino DevOps — CI/CD with Jenkins, Docker & Kubernetes
 
-A complete DevOps project demonstrating automated application deployment using **Jenkins**, **Docker**, and **Kubernetes**.
+## Project Overview
 
----
+This project demonstrates an end-to-end **CI/CD pipeline** that automates the build, containerization, and deployment of a Node.js application using **Jenkins**, **Docker**, and **Kubernetes**.
 
-## 📁 Project Structure
+## Architecture
+
+```
+GitHub Repository
+       │
+       ▼
+    Jenkins Pipeline
+       │
+       ├── 1. Clone Code from GitHub
+       ├── 2. Build Docker Image
+       ├── 3. Login to Docker Hub
+       ├── 4. Push Docker Image
+       ├── 5. Apply Kubernetes Namespace
+       └── 6. Deploy to Kubernetes
+              │
+              ▼
+       Kubernetes Cluster
+       ├── 2 Pods (my-app)
+       └── NodePort Service (port 30080)
+```
+
+## Folder Structure
 
 ```
 vino-devops/
 ├── app/
-│   ├── server.js          # Node.js Express application
-│   └── package.json       # Node.js dependencies
+│   ├── package.json
+│   └── server.js
 ├── k8s/
-│   ├── namespace.yaml     # Kubernetes namespace
-│   ├── deployment.yaml    # Deployment with 2 replicas + health checks
-│   └── service.yaml       # NodePort service (port 30080)
-├── Dockerfile             # Multi-stage Docker build
-├── .dockerignore           # Docker build exclusions
-├── Jenkinsfile            # CI/CD pipeline definition
+│   ├── namespace.yaml
+│   ├── deployment.yaml
+│   └── service.yaml
+├── .dockerignore
+├── Dockerfile
+├── Jenkinsfile
 └── README.md
 ```
 
----
+## Prerequisites
 
-## 🔄 Pipeline Architecture
+- **Jenkins** (with Docker and Kubernetes plugins)
+- **Docker** (installed on Jenkins agent)
+- **Kubernetes** cluster (Minikube or any K8s cluster)
+- **kubectl** (configured to access your cluster)
+- **Docker Hub** account
 
-```
-┌──────────┐    ┌──────────┐    ┌───────────────┐    ┌──────────────┐    ┌─────────────┐    ┌──────────┐
-│ GitHub   │───▶│ Jenkins  │───▶│ Docker Build  │───▶│ Docker Hub   │───▶│ Kubernetes  │───▶│ Verify   │
-│ Push     │    │ Checkout │    │ & Tag         │    │ Push         │    │ Deploy      │    │ Rollout  │
-└──────────┘    └──────────┘    └───────────────┘    └──────────────┘    └─────────────┘    └──────────┘
-     │                                                                                           │
-     │              GitHub Webhook triggers Jenkins automatically                                │
-     └───────────────────────────────────────────────────────────────────────────────────────────┘
-```
+## Steps to Run
 
----
-
-## 📋 Prerequisites
-
-| Tool        | Version  | Purpose                        |
-|-------------|----------|--------------------------------|
-| Jenkins     | 2.x+     | CI/CD automation               |
-| Docker      | 20.x+    | Containerization               |
-| kubectl     | 1.25+    | Kubernetes CLI                 |
-| Node.js     | 18.x+    | Application runtime            |
-| Git         | 2.x+     | Version control                |
-
----
-
-## ⚙️ Setup Instructions
-
-### 1. Jenkins Configuration
-
-#### Required Plugins
-- Docker Pipeline
-- GitHub Integration
-- Kubernetes CLI
-- Credentials Binding
-
-#### Credentials to Add (Manage Jenkins → Credentials)
-
-| Credential ID            | Type              | Description                     |
-|--------------------------|-------------------|---------------------------------|
-| `dockerhub-credentials`  | Username/Password | Docker Hub login                |
-| `kubeconfig-credentials`  | Secret File       | Kubernetes cluster kubeconfig   |
-
-### 2. Docker Hub Setup
-
-1. Create a Docker Hub account at [hub.docker.com](https://hub.docker.com)
-2. Create a repository named `vino-devops-app`
-3. Update `DOCKER_REPO` in the `Jenkinsfile` with your Docker Hub username
-
-### 3. Kubernetes Cluster Setup
+### 1. Push Code to GitHub
 
 ```bash
-# Create the Docker Hub pull secret
-kubectl create secret docker-registry dockerhub-secret \
-  --docker-server=docker.io \
-  --docker-username=<your-username> \
-  --docker-password=<your-password> \
-  --docker-email=<your-email> \
-  -n vino-devops
+git init
+git add .
+git commit -m "first commit"
+git branch -M main
+git remote add origin https://github.com/<your-username>/vino-devops.git
+git push -u origin main
 ```
 
-### 4. GitHub Webhook (Optional)
+### 2. Configure Jenkins Pipeline
 
-1. Go to your GitHub repo → **Settings** → **Webhooks**
-2. Add webhook:
-   - **URL**: `http://<jenkins-url>/github-webhook/`
-   - **Content type**: `application/json`
-   - **Events**: Just the push event
+1. Open Jenkins → **New Item** → **Pipeline**
+2. Under **Pipeline**, select **Pipeline script from SCM**
+3. Set SCM to **Git** and enter your repository URL
+4. Set **Script Path** to `Jenkinsfile`
+5. Save
 
----
+### 3. Add Docker Hub Credentials in Jenkins
 
-## 🏃 Running Locally
+1. Go to **Manage Jenkins** → **Credentials** → **Global**
+2. Click **Add Credentials**
+3. Select **Username with password**
+4. Enter:
+   - **Username**: your Docker Hub username
+   - **Password**: your Docker Hub password or access token
+   - **ID**: `dockerhub-password`
+5. Click **OK**
 
-```bash
-# Install dependencies
-cd app
-npm install
+### 4. Update Image Name
 
-# Start the server
-npm start
+Update the `DOCKER_IMAGE` variable in the `Jenkinsfile`:
 
-# Available endpoints
-# http://localhost:3000         → Home
-# http://localhost:3000/health  → Health check
-# http://localhost:3000/api/info → API info
+```groovy
+DOCKER_IMAGE = "vinothinisenniappan/vino-app"
 ```
 
----
+Also update the image in `k8s/deployment.yaml`:
 
-## 🐳 Docker Commands
-
-```bash
-# Build
-docker build -t vino-devops-app:latest .
-
-# Run
-docker run -d -p 3000:3000 --name vino-app vino-devops-app:latest
-
-# Test
-curl http://localhost:3000/health
+```yaml
+image: vinothinisenniappan/vino-app:latest
 ```
 
----
+### 5. Run the Build
 
-## ☸️ Kubernetes Commands
+- Click **Build Now** in Jenkins
+- Monitor the pipeline stages in the console output
+
+## Expected Output
+
+After a successful pipeline run:
+
+| Result | Details |
+|--------|---------|
+| Docker image pushed | `vinothinisenniappan/vino-app:latest` on Docker Hub |
+| Kubernetes pods running | 2 replicas of `my-app` in namespace `vino-devops` |
+| App accessible | Via NodePort at `http://<node-ip>:30080` |
+
+### Verify
 
 ```bash
-# Apply all manifests
-kubectl apply -f k8s/namespace.yaml
-kubectl apply -f k8s/deployment.yaml -n vino-devops
-kubectl apply -f k8s/service.yaml -n vino-devops
-
-# Check status
+# Check pods
 kubectl get pods -n vino-devops
+
+# Check service
 kubectl get svc -n vino-devops
 
-# Access the app (Minikube)
-minikube service vino-devops-service -n vino-devops
+# Access the app
+curl http://<node-ip>:30080
+# Output: App is running
 
-# Access the app (NodePort)
-# http://<node-ip>:30080
+curl http://<node-ip>:30080/health
+# Output: {"status":"OK"}
 ```
-
----
-
-## 🛡️ Security Best Practices
-
-- ✅ Non-root container user
-- ✅ Multi-stage Docker build (minimal image size)
-- ✅ Credentials stored securely in Jenkins
-- ✅ Resource limits enforced in Kubernetes
-- ✅ Health checks for automatic recovery
-- ✅ Rolling update strategy (zero downtime)
-
----
-
-## 📝 License
-
-MIT License

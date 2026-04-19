@@ -1,141 +1,77 @@
 pipeline {
     agent any
 
-    // ──────────────────────────────────────────────
-    // Environment Variables
-    // ──────────────────────────────────────────────
     environment {
-        DOCKER_REGISTRY  = 'docker.io'
-        DOCKER_REPO      = 'vinodevops'                          // ← Replace with your Docker Hub username
-        IMAGE_NAME       = 'vino-devops-app'
-        IMAGE_TAG        = "${env.BUILD_NUMBER}"
-        FULL_IMAGE       = "${DOCKER_REGISTRY}/${DOCKER_REPO}/${IMAGE_NAME}"
-        K8S_NAMESPACE    = 'vino-devops'
-        DOCKER_CREDS_ID  = 'dockerhub-credentials'              // Jenkins credentials ID
-        KUBECONFIG_ID    = 'kubeconfig-credentials'              // Jenkins credentials ID
-    }
-
-    // ──────────────────────────────────────────────
-    // Triggers
-    // ──────────────────────────────────────────────
-    triggers {
-        githubPush()    // Auto-trigger on GitHub webhook push
-    }
-
-    options {
-        timestamps()
-        timeout(time: 30, unit: 'MINUTES')
-        disableConcurrentBuilds()
-        buildDiscarder(logRotator(numToKeepStr: '10'))
+        DOCKER_IMAGE = "vinothinisenniappan/vino-app"
+        TAG = "latest"
     }
 
     stages {
 
-        // ──────────────────────────────────
-        // Stage 1: Clone Repository
-        // ──────────────────────────────────
-        stage('Checkout') {
+        // Stage 1: Clone Code from GitHub
+        stage('Clone Code') {
             steps {
-                echo '📥 Cloning repository...'
+                echo 'Cloning source code from GitHub...'
                 checkout scm
             }
         }
 
-        // ──────────────────────────────────
         // Stage 2: Build Docker Image
-        // ──────────────────────────────────
         stage('Build Docker Image') {
             steps {
-                echo "🔨 Building Docker image: ${FULL_IMAGE}:${IMAGE_TAG}"
-                script {
-                    dockerImage = docker.build("${FULL_IMAGE}:${IMAGE_TAG}", ".")
-                }
+                echo 'Building Docker image...'
+                sh "docker build --no-cache -t ${DOCKER_IMAGE}:${TAG} ."
             }
         }
 
-        // ──────────────────────────────────
-        // Stage 3: Login to Docker Registry
-        // ──────────────────────────────────
-        stage('Login to Docker Registry') {
+        // Stage 3: Login to Docker Hub
+        stage('Login to Docker Hub') {
             steps {
-                echo '🔐 Logging into Docker Hub...'
+                echo 'Logging into Docker Hub...'
                 withCredentials([usernamePassword(
-                    credentialsId: "${DOCKER_CREDS_ID}",
-                    usernameVariable: 'DOCKER_USER',
-                    passwordVariable: 'DOCKER_PASS'
+                    credentialsId: 'dockerhub-password',
+                    usernameVariable: 'USER',
+                    passwordVariable: 'PASS'
                 )]) {
-                    sh 'echo "$DOCKER_PASS" | docker login ${DOCKER_REGISTRY} -u "$DOCKER_USER" --password-stdin'
+                    sh 'echo $PASS | docker login -u $USER --password-stdin'
                 }
             }
         }
 
-        // ──────────────────────────────────
         // Stage 4: Push Docker Image
-        // ──────────────────────────────────
         stage('Push Docker Image') {
             steps {
-                echo "📤 Pushing image: ${FULL_IMAGE}:${IMAGE_TAG} and ${FULL_IMAGE}:latest"
-                script {
-                    // Push versioned tag
-                    docker.image("${FULL_IMAGE}:${IMAGE_TAG}").push()
-
-                    // Tag and push 'latest'
-                    docker.image("${FULL_IMAGE}:${IMAGE_TAG}").push('latest')
-                }
+                echo 'Pushing Docker image to Docker Hub...'
+                sh "docker push ${DOCKER_IMAGE}:${TAG}"
             }
         }
 
-        // ──────────────────────────────────
-        // Stage 5: Deploy to Kubernetes
-        // ──────────────────────────────────
+        // Stage 5: Apply Kubernetes Namespace
+        stage('Apply Kubernetes Namespace') {
+            steps {
+                echo 'Creating Kubernetes namespace...'
+                sh 'kubectl apply -f k8s/namespace.yaml'
+                sh 'kubectl get namespace vino-devops'
+            }
+        }
+
+        // Stage 6: Deploy to Kubernetes
         stage('Deploy to Kubernetes') {
             steps {
-                echo '☸️  Deploying to Kubernetes cluster...'
-                withCredentials([file(credentialsId: "${KUBECONFIG_ID}", variable: 'KUBECONFIG')]) {
-                    // Create namespace if it doesn't exist
-                    sh "kubectl apply -f k8s/namespace.yaml"
-
-                    // Update deployment image tag
-                    sh """
-                        sed -i 's|image:.*|image: ${FULL_IMAGE}:${IMAGE_TAG}|g' k8s/deployment.yaml
-                    """
-
-                    // Apply Kubernetes manifests
-                    sh "kubectl apply -f k8s/deployment.yaml -n ${K8S_NAMESPACE}"
-                    sh "kubectl apply -f k8s/service.yaml -n ${K8S_NAMESPACE}"
-                }
-            }
-        }
-
-        // ──────────────────────────────────
-        // Stage 6: Verify Deployment
-        // ──────────────────────────────────
-        stage('Verify Deployment') {
-            steps {
-                echo '✅ Verifying deployment rollout...'
-                withCredentials([file(credentialsId: "${KUBECONFIG_ID}", variable: 'KUBECONFIG')]) {
-                    sh "kubectl rollout status deployment/vino-devops-app -n ${K8S_NAMESPACE} --timeout=120s"
-                    sh "kubectl get pods -n ${K8S_NAMESPACE} -l app=vino-devops-app"
-                    sh "kubectl get svc -n ${K8S_NAMESPACE} -l app=vino-devops-app"
-                }
+                echo 'Deploying application to Kubernetes...'
+                sh 'kubectl apply -f k8s/deployment.yaml'
+                sh 'kubectl apply -f k8s/service.yaml'
+                sh 'kubectl rollout restart deployment my-app -n vino-devops'
             }
         }
     }
 
-    // ──────────────────────────────────────────────
-    // Post Actions
-    // ──────────────────────────────────────────────
     post {
         success {
-            echo '🎉 Pipeline completed successfully! Application deployed.'
+            echo 'Pipeline completed successfully! Application deployed.'
         }
         failure {
-            echo '❌ Pipeline failed. Check the logs above for errors.'
-        }
-        always {
-            echo '🧹 Cleaning up workspace...'
-            sh 'docker logout ${DOCKER_REGISTRY} || true'
-            cleanWs()
+            echo 'Pipeline failed. Check the logs for errors.'
         }
     }
 }

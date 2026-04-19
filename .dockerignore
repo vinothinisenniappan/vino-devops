@@ -1,12 +1,3 @@
 node_modules
-npm-debug.log
+logs
 .git
-.gitignore
-Jenkinsfile
-k8s/
-README.md
-.dockerignore
-.env
-*.md
-.vscode
-.idea

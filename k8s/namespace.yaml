@@ -2,6 +2,3 @@ apiVersion: v1
 kind: Namespace
 metadata:
   name: vino-devops
-  labels:
-    project: vino-devops
-    managed-by: jenkins
