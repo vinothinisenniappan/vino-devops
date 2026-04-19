@@ -20,7 +20,7 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 echo 'Building Docker image...'
-                sh "docker build --no-cache -t ${DOCKER_IMAGE}:${TAG} ."
+                bat "docker build --no-cache -t %DOCKER_IMAGE%:%TAG% ."
             }
         }
 
@@ -33,7 +33,7 @@ pipeline {
                     usernameVariable: 'USER',
                     passwordVariable: 'PASS'
                 )]) {
-                    sh 'echo $PASS | docker login -u $USER --password-stdin'
+                    bat "echo %PASS% | docker login -u %USER% --password-stdin"
                 }
             }
         }
@@ -42,7 +42,7 @@ pipeline {
         stage('Push Docker Image') {
             steps {
                 echo 'Pushing Docker image to Docker Hub...'
-                sh "docker push ${DOCKER_IMAGE}:${TAG}"
+                bat "docker push %DOCKER_IMAGE%:%TAG%"
             }
         }
 
@@ -50,8 +50,8 @@ pipeline {
         stage('Apply Kubernetes Namespace') {
             steps {
                 echo 'Creating Kubernetes namespace...'
-                sh 'kubectl apply -f k8s/namespace.yaml'
-                sh 'kubectl get namespace vino-devops'
+                bat "kubectl apply -f k8s/namespace.yaml"
+                bat "kubectl get namespace vino-devops"
             }
         }
 
@@ -59,9 +59,9 @@ pipeline {
         stage('Deploy to Kubernetes') {
             steps {
                 echo 'Deploying application to Kubernetes...'
-                sh 'kubectl apply -f k8s/deployment.yaml'
-                sh 'kubectl apply -f k8s/service.yaml'
-                sh 'kubectl rollout restart deployment my-app -n vino-devops'
+                bat "kubectl apply -f k8s/deployment.yaml"
+                bat "kubectl apply -f k8s/service.yaml"
+                bat "kubectl rollout restart deployment my-app -n vino-devops"
             }
         }
     }
