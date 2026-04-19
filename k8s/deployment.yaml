@@ -1,0 +1,72 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vino-devops-app
+  namespace: vino-devops
+  labels:
+    app: vino-devops-app
+    version: latest
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: vino-devops-app
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: vino-devops-app
+    spec:
+      containers:
+        - name: vino-devops-app
+          image: docker.io/vinodevops/vino-devops-app:latest    # Updated by Jenkins pipeline
+          ports:
+            - containerPort: 3000
+              protocol: TCP
+          env:
+            - name: NODE_ENV
+              value: "production"
+            - name: PORT
+              value: "3000"
+            - name: APP_VERSION
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.labels['version']
+
+          # ── Health Checks ──────────────────────────
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 3
+
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+
+          # ── Resource Limits ────────────────────────
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "250m"
+
+      # Pull secret for private Docker registry (configure in K8s)
+      imagePullSecrets:
+        - name: dockerhub-secret
+
+      restartPolicy: Always
